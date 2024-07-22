@@ -1,21 +1,43 @@
+const WebSocket = require("ws");
 const http = require("http");
 
-const hostname = "127.0.0.1";
-const port = 8080;
+const rooms = new Map();
 
-const server = http.createServer((req, res) => {
-  if (req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("Welcome to Gong-Gan!\n");
-  } else if (req.url === "/about") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("About page\n");
-  } else {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("Not Found\n");
-  }
+const server = http.createServer((_, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("WebSocket server running\n");
 });
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
+const wss = new WebSocket.Server({ server });
+
+wss.on("connection", (ws) => {
+  ws.on("message", (message) => {
+    try {
+      const data = JSON.parse(message);
+
+      switch (data.type) {
+        case "createRoom":
+          if (rooms.has(data.roomId)) {
+            ws.send(JSON.stringify({ type: "error", message: "Room already exists" }));
+          } else {
+            rooms.set(data.roomId, data.url);
+            ws.send(JSON.stringify({ type: "roomCreated", roomId: data.roomId }));
+          }
+          break;
+
+        case "joinRoom":
+          if (rooms.has(data.roomId)) {
+            ws.send(JSON.stringify({ type: "roomJoined", url: rooms.get(data.roomId) }));
+          } else {
+            ws.send(JSON.stringify({ type: "error", message: "Room not found" }));
+          }
+          break;
+
+        default:
+          ws.send(JSON.stringify({ type: "error", message: "Unknown action" }));
+      }
+    } catch (e) {
+      ws.send(JSON.stringify({ type: "error", message: "Invalid message format" }));
+    }
+  });
 });
