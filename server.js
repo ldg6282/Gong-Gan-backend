@@ -18,7 +18,14 @@ wss.on("connection", (ws) => {
       switch (data.type) {
         case "createRoom":
           if (rooms.has(data.roomId)) {
-            ws.send(JSON.stringify({ type: "error", message: "Room already exists" }));
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                context: "createRoom",
+                errorCode: "roomAlreadyExists",
+                message: "Room already exists",
+              }),
+            );
           } else {
             rooms.set(data.roomId, data.url);
             ws.send(JSON.stringify({ type: "roomCreated", roomId: data.roomId }));
@@ -29,15 +36,36 @@ wss.on("connection", (ws) => {
           if (rooms.has(data.roomId)) {
             ws.send(JSON.stringify({ type: "roomJoined", url: rooms.get(data.roomId) }));
           } else {
-            ws.send(JSON.stringify({ type: "error", message: "Room not found" }));
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                context: "joinRoom",
+                errorCode: "roomNotFound",
+                message: "Room not found",
+              }),
+            );
           }
           break;
 
         default:
-          ws.send(JSON.stringify({ type: "error", message: "Unknown action" }));
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              context: "unknownAction",
+              errorCode: "unknown",
+              message: "Unknown action",
+            }),
+          );
       }
     } catch (e) {
-      ws.send(JSON.stringify({ type: "error", message: "Invalid message format" }));
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          context: "invalidMessageFormat",
+          errorCode: "invalidFormat",
+          message: "Invalid message format",
+        }),
+      );
     }
   });
 });
