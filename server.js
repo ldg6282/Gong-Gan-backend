@@ -3,7 +3,6 @@ const http = require("http");
 
 const rooms = new Map();
 const clients = new Map();
-let currentRoomId = null;
 
 const server = http.createServer((_, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
@@ -31,7 +30,7 @@ wss.on("connection", (ws) => {
               }),
             );
           } else {
-            rooms.set(data.roomId, data.url);
+            rooms.set(data.roomId, { url: data.url, clients: new Set() });
             ws.send(JSON.stringify({ type: "roomCreated", roomId: data.roomId }));
           }
           break;
@@ -39,22 +38,25 @@ wss.on("connection", (ws) => {
 
         case "joinRoom": {
           if (rooms.has(data.roomId)) {
-            currentRoomId = data.roomId;
-            clients.set(ws, currentRoomId);
+            const room = rooms.get(data.roomId);
+            room.clients.add(ws);
+            clients.set(ws, { roomId: data.roomId, userId: data.userId });
             ws.send(
               JSON.stringify({
                 type: "roomJoined",
-                url: rooms.get(data.roomId),
+                url: room.url,
                 roomId: data.roomId,
+                userId: data.userId,
               }),
             );
 
-            wss.clients.forEach((client) => {
-              if (client !== ws && clients.get(client) === currentRoomId) {
+            room.clients.forEach((client) => {
+              if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(
                   JSON.stringify({
                     type: "clientJoined",
                     message: "A new client has joined the room.",
+                    userId: data.userId,
                   }),
                 );
               }
@@ -72,17 +74,32 @@ wss.on("connection", (ws) => {
           break;
         }
 
-        case "scrollUpdate": {
-          const clientRoomId = clients.get(ws);
-          if (clientRoomId) {
-            wss.clients.forEach((client) => {
-              if (client !== ws && clients.get(client) === clientRoomId) {
-                client.send(JSON.stringify(data));
-              }
-            });
+        case "urlChange":
+        case "scrollUpdate":
+        case "clickEvent": {
+          const clientInfo = clients.get(ws);
+          if (clientInfo) {
+            const room = rooms.get(clientInfo.roomId);
+            if (room) {
+              room.clients.forEach((client) => {
+                if (
+                  client !== ws &&
+                  client.readyState === WebSocket.OPEN &&
+                  clients.get(client).userId !== data.userId
+                ) {
+                  client.send(JSON.stringify(data));
+                }
+              });
+            }
           } else {
-            clients.set(ws, data.roomId);
-            ws.send(JSON.stringify({ type: "roomJoined", roomId: data.roomId }));
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                context: data.type,
+                errorCode: "notInRoom",
+                message: "You are not in a room",
+              }),
+            );
           }
           break;
         }
@@ -110,8 +127,26 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    const roomId = clients.get(ws);
-    if (roomId) {
+    const clientInfo = clients.get(ws);
+    if (clientInfo) {
+      const room = rooms.get(clientInfo.roomId);
+      if (room) {
+        room.clients.delete(ws);
+        if (room.clients.size === 0) {
+          rooms.delete(clientInfo.roomId);
+        } else {
+          room.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(
+                JSON.stringify({
+                  type: "clientLeft",
+                  message: "A client has left the room.",
+                }),
+              );
+            }
+          });
+        }
+      }
       clients.delete(ws);
     }
   });
