@@ -50,6 +50,16 @@ wss.on("connection", (ws) => {
               }),
             );
 
+            if (room.clients.size >= 2) {
+              const firstClient = Array.from(room.clients)[0];
+              firstClient.send(
+                JSON.stringify({
+                  type: "initiatePeerConnection",
+                  message: "Please create an offer",
+                }),
+              );
+            }
+
             room.clients.forEach((client) => {
               if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(
@@ -68,6 +78,37 @@ wss.on("connection", (ws) => {
                 context: "joinRoom",
                 errorCode: "roomNotFound",
                 message: "Room not found",
+              }),
+            );
+          }
+          break;
+        }
+
+        case "webrtcOffer":
+        case "webrtcAnswer":
+        case "webrtcIceCandidate": {
+          const clientInfo = clients.get(ws);
+          if (clientInfo) {
+            const room = rooms.get(clientInfo.roomId);
+            if (room) {
+              room.clients.forEach((client) => {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                  client.send(
+                    JSON.stringify({
+                      ...data,
+                      userId: clientInfo.userId,
+                    }),
+                  );
+                }
+              });
+            }
+          } else {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                context: data.type,
+                errorCode: "notInRoom",
+                message: "You are not in a room",
               }),
             );
           }
