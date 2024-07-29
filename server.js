@@ -145,6 +145,34 @@ wss.on("connection", (ws) => {
           break;
         }
 
+        case "drawEvent": {
+          const clientInfo = clients.get(ws);
+          if (clientInfo) {
+            const room = rooms.get(clientInfo.roomId);
+            if (room) {
+              room.clients.forEach((client) => {
+                if (
+                  client !== ws &&
+                  client.readyState === WebSocket.OPEN &&
+                  clients.get(client).userId !== data.userId
+                ) {
+                  client.send(JSON.stringify(data));
+                }
+              });
+            }
+          } else {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                context: data.type,
+                errorCode: "notInRoom",
+                message: "You are not in a room",
+              }),
+            );
+          }
+          break;
+        }
+
         default:
           ws.send(
             JSON.stringify({
