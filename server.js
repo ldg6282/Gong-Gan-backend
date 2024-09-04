@@ -1,6 +1,11 @@
 const WebSocket = require("ws");
 const http = require("http");
 
+let nanoid;
+import("nanoid").then((module) => {
+  nanoid = module.nanoid;
+});
+
 const rooms = new Map();
 const clients = new Map();
 
@@ -14,7 +19,7 @@ const wss = new WebSocket.Server({ server });
 function generateUniqueRoomId() {
   let newRoomId;
   do {
-    newRoomId = Math.random().toString(36).slice(2, 11);
+    newRoomId = nanoid();
   } while (rooms.has(newRoomId));
   return newRoomId;
 }
