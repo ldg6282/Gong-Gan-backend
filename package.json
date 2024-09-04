@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "nanoid": "^5.0.7",
     "ws": "^8.18.0"
   },
   "devDependencies": {
