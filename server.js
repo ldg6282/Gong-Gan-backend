@@ -1,11 +1,6 @@
 const WebSocket = require("ws");
 const http = require("http");
 
-let nanoid;
-import("nanoid").then((module) => {
-  nanoid = module.nanoid;
-});
-
 const rooms = new Map();
 const clients = new Map();
 
@@ -16,14 +11,6 @@ const server = http.createServer((_, res) => {
 
 const wss = new WebSocket.Server({ server });
 
-function generateUniqueRoomId() {
-  let newRoomId;
-  do {
-    newRoomId = nanoid();
-  } while (rooms.has(newRoomId));
-  return newRoomId;
-}
-
 wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     const messageText = message.toString();
@@ -32,12 +19,6 @@ wss.on("connection", (ws) => {
       const data = JSON.parse(messageText);
 
       switch (data.type) {
-        case "generateRoomId": {
-          const roomId = generateUniqueRoomId();
-          ws.send(JSON.stringify({ type: "roomIdGenerated", roomId }));
-          break;
-        }
-
         case "createRoom": {
           if (rooms.has(data.roomId)) {
             ws.send(
